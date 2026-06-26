@@ -1,0 +1,82 @@
+# Purpose: run the complete reproducible workflow in manuscript order.
+# Inputs: data/processed/analysis_dataset.tsv by default.
+# Outputs: manuscript result tables, figures, model objects, and logs.
+
+# This runner intentionally avoids global sink(). Global log sinks can make
+# RStudio look frozen because source(echo = TRUE) output is diverted/buffered.
+
+set.seed(20260626)
+
+script_path <- tryCatch(normalizePath(sys.frame(1)$ofile, winslash = "/", mustWork = TRUE),
+  error = function(e) NA_character_
+)
+if (!is.na(script_path)) {
+  repo_root <- dirname(script_path)
+  if (!identical(normalizePath(getwd(), winslash = "/", mustWork = TRUE), repo_root)) {
+    setwd(repo_root)
+  }
+}
+
+if (!file.exists("run_all.R") || !dir.exists("R") || !dir.exists("functions")) {
+  stop("Please run this script from the reproducible_plos_sleep_hd_mortality folder, or source it by full path.")
+}
+
+fast_test <- tolower(Sys.getenv("FAST_TEST", "false")) %in% c("true", "1", "yes")
+scripts <- c(
+  "R/01_download_or_locate_nhanes.R",
+  "R/02_build_analysis_dataset.R",
+  "R/03_descriptive_table1.R",
+  "R/04_cox_continuous.R",
+  "R/05_cox_categorical.R",
+  "R/06_multiple_imputation.R",
+  "R/07_rcs_spline.R",
+  "R/08_fine_gray_sensitivity.R",
+  "R/09_ph_diagnostics.R",
+  "R/10_export_all_tables_figures.R"
+)
+
+dir.create(file.path("outputs", "logs"), recursive = TRUE, showWarnings = FALSE)
+log_file <- file.path(
+  "outputs", "logs",
+  paste0("run_all_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".log")
+)
+
+log_msg <- function(...) {
+  txt <- paste0(...)
+  cat(txt, "\n")
+  cat(txt, "\n", file = log_file, append = TRUE)
+  flush.console()
+}
+
+log_msg("Starting reproducible workflow")
+log_msg("Time: ", as.character(Sys.time()))
+log_msg("Working directory: ", getwd())
+log_msg("fast_test: ", fast_test)
+log_msg("Log file: ", log_file)
+log_msg("Formal MI setting: m = 50, maxit = 10. This step can take a long time.")
+
+for (script in scripts) {
+  if (!file.exists(script)) {
+    stop("Missing script: ", script)
+  }
+  log_msg("")
+  log_msg("============================================================")
+  log_msg("Running: ", script)
+  log_msg("Started: ", as.character(Sys.time()))
+  log_msg("============================================================")
+  tryCatch(
+    {
+      source(script, echo = FALSE, local = FALSE)
+      log_msg("Finished: ", script, " at ", as.character(Sys.time()))
+    },
+    error = function(e) {
+      log_msg("FAILED: ", script)
+      log_msg("Error: ", conditionMessage(e))
+      stop(e)
+    }
+  )
+}
+
+log_msg("")
+log_msg("Workflow completed successfully.")
+log_msg("Time: ", as.character(Sys.time()))
