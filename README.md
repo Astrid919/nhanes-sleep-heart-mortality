@@ -35,8 +35,6 @@ The manuscript reports R version 4.4.2 with:
 - `mice` 3.19.0
 - `writexl` for XLSX export
 
-The current terminal used for this folder preparation did not have `Rscript` on PATH, so model refitting was not executed here.
-
 ## How To Reproduce
 
 1. Clone or download this repository.
